@@ -35,3 +35,15 @@ QR 코드 생성기 웹 애플리케이션을 개발하면서 완료된 상세 �
 - [x] JavaScript에 `mousemove` 이벤트를 추가하여 사용자의 마우스 좌표 위치를 퍼센트(%) 값으로 실시간 계산
 - [x] 계산된 마우스 위치를 CSS 변수(`--mouse-x`, `--mouse-y`)로 실시간 주입
 - [x] CSS `::before` 가상 요소에 원형 방사형 그라데이션(Radial Gradient)을 적용하여, 파스텔 톤 색상이 마우스를 따라다니는 빛 번짐(Glow) 효과 완성
+
+## 7. URL 단축 기능 (`urlShort/` 구현)
+- [x] URL 단축 화면 UI 구성 (입력 필드, '단축하기' 버튼, 읽기 전용 결과 상자, '복사' 버튼)
+- [x] 입력창의 값 유무에 따른 '단축하기' 버튼 활성화/비활성화 상태 제어 (disabled 속성 조작)
+- [x] 클립보드 복사(Clipboard API) 및 '복사하였습니다' 팝업(Toast) 알림 구현
+- [x] 무료 URL 단축 API(TinyURL, is.gd) 연동 및 CORS 우회를 위한 프록시 적용
+- [x] **API 안정성 강화**: 1차 프록시 서버(TinyURL) 타임아웃 8초 설정 및 실패 시 2차(is.gd JSONP) 자동 전환하는 Dual-API Fallback 로직 완성
+
+## 8. 최종 통합 및 오류 수정 (Troubleshooting)
+- [x] 최상위 디렉토리에 허브 `index.html` 생성 및 `url2qr/`, `urlShort/` 독립 기능 폴더 라우팅 연결
+- [x] GitHub Pages 배포 환경에서의 상위 폴더 이동(`../`) 라우팅 문제 수정
+- [x] 브라우저 캐시로 인해 구버전 스크립트가 실행되는 문제를 방지하기 위한 Cache Busting (`script.js?v=2`) 강제 적용

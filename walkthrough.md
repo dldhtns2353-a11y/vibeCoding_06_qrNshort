@@ -149,3 +149,56 @@ function downloadImage(dataUrl) {
     img.src = dataUrl;
 }
 ```
+
+---
+
+## 5. URL 단축기 핵심 로직 (`urlShort/script.js`)
+
+새롭게 추가된 URL 단축기는 브라우저의 보안 정책(CORS)과 서드파티 API의 불안정성을 극복하기 위해 정교하게 설계되었습니다.
+
+### 5.1. Dual-API 비동기 처리 및 이중 안전장치(Fallback)
+단일 API에 의존할 경우 서버가 다운되거나 응답이 지연될 때 사용자가 무한정 기다려야 하는 문제가 있습니다. 이를 방지하기 위해 1차와 2차로 나누어 API를 호출합니다.
+
+```javascript
+try {
+    // 1차 시도: allorigins 프록시 + TinyURL
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent('https://tinyurl.com/api-create.php?url=' + encodeURIComponent(url))}`;
+    
+    // 타임아웃 8초 설정 (무한 대기 방지)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    
+    const response = await fetch(proxyUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    
+    // ... 정상 응답 시 성공 처리
+} catch (error) {
+    // 1차 프록시가 지연되거나 실패하면 즉시 2차 시도 (JSONP 방식)
+    const callbackName = 'isgdCallback_' + Math.round(100000 * Math.random());
+    
+    // JSONP 타임아웃 5초 설정
+    const jsonpTimeoutId = setTimeout(() => { ... }, 5000);
+    
+    // 동적으로 <script> 태그를 생성하여 is.gd 호출 (CORS 우회)
+    const script = document.createElement('script');
+    script.id = callbackName;
+    script.src = `https://is.gd/create.php?format=json&url=${encodeURIComponent(url)}&callback=${callbackName}`;
+    document.body.appendChild(script);
+}
+```
+
+### 5.2. 클립보드 복사 (Clipboard API)
+사용자가 단축된 URL을 손쉽게 사용할 수 있도록 최신 브라우저 API를 활용합니다.
+```javascript
+navigator.clipboard.writeText(shortUrlInput.value)
+    .then(() => {
+        showToast(); // 복사 성공 시 토스트 알림 띄우기
+    })
+```
+
+### 5.3. 브라우저 캐시 무효화 (Cache Busting)
+GitHub Pages와 같이 CDN을 사용하는 환경에서는 HTML이 업데이트되어도 자바스크립트 파일(`script.js`)이 브라우저에 강력하게 캐싱되어 예전 코드가 실행될 수 있습니다. 이를 방지하기 위해 `index.html`에서 스크립트를 불러올 때 쿼리 스트링을 달아줍니다.
+```html
+<!-- ?v=2 를 붙여 브라우저가 최신 파일을 새로 다운로드하도록 강제함 -->
+<script src="script.js?v=2"></script>
+```
