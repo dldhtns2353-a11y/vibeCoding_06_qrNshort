@@ -22,9 +22,15 @@ shortenBtn.addEventListener('click', async () => {
     shortenBtn.disabled = true;
     
     try {
-        // TinyURL API bypassed via allorigins CORS proxy to support all URLs (even fake domains)
+        // 1차 시도: allorigins 프록시 + TinyURL (가장 호환성이 높으나 프록시 서버가 불안정할 수 있음)
         const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent('https://tinyurl.com/api-create.php?url=' + encodeURIComponent(url))}`;
-        const response = await fetch(proxyUrl);
+        
+        // 8초 타임아웃
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        
+        const response = await fetch(proxyUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
         
         if (!response.ok) throw new Error('Network response was not ok');
         
@@ -32,15 +38,57 @@ shortenBtn.addEventListener('click', async () => {
         
         if (data.contents && data.contents.startsWith('http')) {
             shortUrlInput.value = data.contents;
-        } else {
-            alert('URL 단축에 실패했습니다. 올바른 URL인지 확인해주세요.');
+            shortenBtn.textContent = '단축하기';
+            shortenBtn.disabled = false;
+            return; // 성공 시 종료
         }
+        throw new Error('Invalid URL');
     } catch (error) {
-        console.error('Error shortening URL:', error);
-        alert('오류가 발생했습니다. 네트워크 상태를 확인하시거나 잠시 후 다시 시도해주세요.');
-    } finally {
-        shortenBtn.textContent = '단축하기';
-        shortenBtn.disabled = false;
+        console.warn('1차 API 실패, 2차 API(is.gd JSONP) 시도...', error);
+        
+        // 2차 시도: is.gd API with JSONP (프록시 없이 직접 통신하나 일부 URL을 거부할 수 있음)
+        const callbackName = 'isgdCallback_' + Math.round(100000 * Math.random());
+        
+        const jsonpTimeoutId = setTimeout(() => {
+            if (window[callbackName]) {
+                alert('URL 단축에 실패했습니다. (유효하지 않은 주소이거나 일시적인 네트워크 오류입니다.)');
+                shortenBtn.textContent = '단축하기';
+                shortenBtn.disabled = false;
+                delete window[callbackName];
+                
+                const scriptElement = document.getElementById(callbackName);
+                if (scriptElement) document.body.removeChild(scriptElement);
+            }
+        }, 5000); // 5초 타임아웃
+
+        window[callbackName] = function(data) {
+            clearTimeout(jsonpTimeoutId);
+            delete window[callbackName];
+            const scriptElement = document.getElementById(callbackName);
+            if (scriptElement) document.body.removeChild(scriptElement);
+            
+            if (data && data.shorturl) {
+                shortUrlInput.value = data.shorturl;
+            } else {
+                alert('URL 단축에 실패했습니다. 정확한 URL인지 확인해주세요.');
+            }
+            shortenBtn.textContent = '단축하기';
+            shortenBtn.disabled = false;
+        };
+        
+        const script = document.createElement('script');
+        script.id = callbackName;
+        script.src = `https://is.gd/create.php?format=json&url=${encodeURIComponent(url)}&callback=${callbackName}`;
+        
+        script.onerror = function() {
+            clearTimeout(jsonpTimeoutId);
+            alert('오류가 발생했습니다. 네트워크 상태를 확인해주세요.');
+            shortenBtn.textContent = '단축하기';
+            shortenBtn.disabled = false;
+            delete window[callbackName];
+        };
+        
+        document.body.appendChild(script);
     }
 });
 
